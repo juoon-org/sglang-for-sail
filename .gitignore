@@ -283,3 +283,6 @@ artifacts/
 
 # Internal, non-published docs
 internal-docs/
+
+# sailify-generated compatibility headers
+.ppu_compat/

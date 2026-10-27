@@ -12,7 +12,7 @@ from functools import lru_cache
 
 import torch
 
-from sglang.srt.platforms.cuda import CudaDeviceMixin
+from sglang.srt.platforms.cuda import CudaDeviceMixin, CudaSRTPlatform
 from sglang.srt.platforms.device_mixin import PlatformEnum
 from sglang.srt.platforms.interface import PlatformCapabilities, SRTPlatform
 
@@ -39,11 +39,12 @@ class SailDeviceMixin(CudaDeviceMixin):
         return True
 
 
-class SailSRTPlatform(SailDeviceMixin, SRTPlatform):
+class SailSRTPlatform(SailDeviceMixin, CudaSRTPlatform):
     """Default in-tree T-HEAD SAIL SRT platform.
 
-    Inherits CUDA capability flags since SAIL exposes CUDA-compatible APIs
-    (fp8, cuda graph, piecewise cuda graph are supported on SAIL).
+    SAIL exposes the CUDA API surface, so the SRT factories (attention backend,
+    KV pools, graph runners, allocator) are inherited from ``CudaSRTPlatform``;
+    only the platform identity and SAIL capability flags differ.
     """
 
     capabilities = PlatformCapabilities(
@@ -51,6 +52,24 @@ class SailSRTPlatform(SailDeviceMixin, SRTPlatform):
         graph_capture=True,
         piecewise_graph=True,
     )
+
+    # The PPU build used here has no flash-attn-3 / flashinfer wheels, so the
+    # FA3 hook path cannot be the default. triton runs through the PPU Triton
+    # backend; torch_native is available but stalls in decode for some prompts
+    # on this SDK. Callers may override to fa3 when flash-attn-3 is installed.
+    def get_default_attention_backend(self) -> str:
+        return "triton"
+
+    # This fork's platform interface dispatches KV pools through get_kv_pool_cls.
+    # Keep the legacy per-kind entry points working for callers that still use them.
+    def get_mha_kv_pool_cls(self):
+        return None
+
+    def get_mla_kv_pool_cls(self):
+        return None
+
+    def get_nsa_kv_pool_cls(self):
+        return None
 
     def is_zw810e(self) -> bool:
         return _ZW810E_NAME in self.get_device_name()

@@ -74,9 +74,12 @@ def handle_ppu_backends(server_args: Any):
                 'Hopper GPUs") and the DSA fa3 decode path requires it. Use '
                 "--dsa-decode-backend flashmla_kv instead (the PPU default)."
             )
-    # Use CUDA PLA fast path by default on PPU.
+    # Use the CUDA PLA fast path by default on PPU when the optional PLA
+    # package is installed; otherwise keep the community Triton kernels.
     if not envs.SGLANG_SAIL_PLA_CUDA.is_set():
-        envs.SGLANG_SAIL_PLA_CUDA.set(True)
+        import importlib.util
+
+        envs.SGLANG_SAIL_PLA_CUDA.set(importlib.util.find_spec("pla") is not None)
     # Use CUDA FLA (Flash Linear Attention) fast path by default on PPU.
     if not envs.SGLANG_SAIL_FLA_CUDA.is_set():
         envs.SGLANG_SAIL_FLA_CUDA.set(True)

@@ -175,7 +175,13 @@ def _activation_row_filter(
 
 
 def _use_moe_sum_reduce_torch_compile(num_tokens: int) -> bool:
-    return num_tokens <= 32 and not is_batch_invariant_mode_enabled()
+    # SAIL's Dynamo path cannot trace the out= reduction (autograd fake tensor
+    # error); use the Triton reduce kernel instead.
+    return (
+        not _is_sail
+        and num_tokens <= 32
+        and not is_batch_invariant_mode_enabled()
+    )
 
 
 @register_custom_op(mutates_args=["hidden_states"])
